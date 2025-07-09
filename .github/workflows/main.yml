@@ -38,9 +38,10 @@ jobs:
 
       - name: Record Emulator Screen
         run: |
-          docker exec android-emulator adb shell screenrecord /sdcard/boot.mp4 &
+          echo "📹 Recording emulator screen..."
+          docker exec android-emulator adb shell screenrecord /data/local/tmp/boot.mp4 &
           sleep 20
-          docker exec android-emulator adb pull /sdcard/boot.mp4 /tmp/boot.mp4
+          docker exec android-emulator adb pull /data/local/tmp/boot.mp4 /tmp/boot.mp4
 
       - name: Upload Emulator Video
         uses: actions/upload-artifact@v4
