@@ -1,4 +1,4 @@
-name: Android Emulator via Docker
+name: Android Emulator with GUI Recording
 
 on:
   workflow_dispatch:
@@ -11,13 +11,13 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Start Android Emulator in Docker
+      - name: Start Android Emulator in Docker (GUI Enabled)
         run: |
           docker run --name android-emulator -d \
             --privileged \
             -e DEVICE="Samsung Galaxy S6" \
             -e AUTO_RECORD=false \
-            -e EMULATOR_ARGS="-no-window -no-audio" \
+            -e EMULATOR_ARGS="-no-audio" \
             -p 6080:6080 -p 5554:5554 -p 5555:5555 \
             budtmo/docker-android:emulator_13.0
 
@@ -26,7 +26,6 @@ jobs:
           echo "⏳ Waiting 60 seconds for emulator to start..."
           sleep 60
           docker exec android-emulator adb wait-for-device
-
           echo "🔍 Checking boot status..."
           boot_completed=""
           until [[ "$boot_completed" == "1" ]]; do
@@ -36,6 +35,20 @@ jobs:
           done
           echo "✅ Emulator is ready!"
 
-      - name: Show Android Version
+      - name: Record Emulator Screen
         run: |
-          docker exec android-emulator adb shell getprop ro.build.version.release
+          docker exec android-emulator adb shell screenrecord /sdcard/boot.mp4 &
+          sleep 20  # Record for 20 seconds
+          docker exec android-emulator adb pull /sdcard/boot.mp4 /tmp/boot.mp4
+
+      - name: Upload Emulator Video
+        uses: actions/upload-artifact@v3
+        with:
+          name: boot-video
+          path: /tmp/boot.mp4
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop android-emulator
+          docker rm android-emulator
