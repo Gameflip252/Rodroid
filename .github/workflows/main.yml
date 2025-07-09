@@ -1,56 +1,40 @@
-name: Android Emulator with GUI Recording
+name: Android Emulator with Public GUI via Ngrok
 
 on:
   workflow_dispatch:
 
 jobs:
   android-emulator:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted  # IMPORTANT: must be a self-hosted runner or cloud VM
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Start Android Emulator in Docker (GUI Enabled)
+      - name: Start Android Emulator with GUI
         run: |
           docker run --name android-emulator -d \
             --privileged \
             -e DEVICE="Samsung Galaxy S6" \
             -e AUTO_RECORD=false \
-            -e EMULATOR_ARGS="-no-audio" \
-            -p 6080:6080 -p 5554:5554 -p 5555:5555 \
+            -p 6080:6080 \
             budtmo/docker-android:emulator_13.0
 
-      - name: Wait for Emulator to Boot
+      - name: Install ngrok
         run: |
-          echo "⏳ Waiting 60 seconds for emulator to start..."
-          sleep 60
-          docker exec android-emulator adb wait-for-device
+          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+          sudo apt update && sudo apt install ngrok -y
 
-          echo "🔍 Checking boot status..."
-          boot_completed=""
-          until [[ "$boot_completed" == "1" ]]; do
-            sleep 5
-            boot_completed=$(docker exec android-emulator adb shell getprop sys.boot_completed | tr -d '\r')
-            echo "Boot status: $boot_completed"
-          done
-          echo "✅ Emulator is ready!"
+      - name: Authenticate ngrok
+        run: ngrok config add-authtoken ${{ secrets.NGROK_TOKEN }}
 
-      - name: Record Emulator Screen
+      - name: Start ngrok tunnel for Android GUI (port 6080)
         run: |
-          echo "📹 Recording emulator screen..."
-          docker exec android-emulator adb shell screenrecord /data/local/tmp/boot.mp4 &
-          sleep 20
-          docker exec android-emulator adb pull /data/local/tmp/boot.mp4 /tmp/boot.mp4
-
-      - name: Upload Emulator Video
-        uses: actions/upload-artifact@v4
-        with:
-          name: boot-video
-          path: /tmp/boot.mp4
-
-      - name: Cleanup
-        if: always()
-        run: |
-          docker stop android-emulator
-          docker rm android-emulator
+          nohup ngrok http 6080 > ngrok.log 2>&1 &
+          sleep 6
+          echo "Fetching ngrok public URL..."
+          curl http://127.0.0.1:4040/api/tunnels > tunnels.json
+          cat tunnels.json
+          echo "🔗 Public Android GUI URL:"
+          jq -r '.tunnels[0].public_url' tunnels.json
