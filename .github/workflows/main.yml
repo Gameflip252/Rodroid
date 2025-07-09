@@ -1,0 +1,38 @@
+name: Android Emulator via Docker (Headless)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  android-emulator:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Start Android Emulator Container
+        run: |
+          docker run --name android-container -d \
+            --privileged \
+            -e DEVICE="pixel" \
+            -e ANDROID_VERSION=29 \
+            -e TARGET=default \
+            budtmo/docker-android-x86-8.1
+
+      - name: Wait for Emulator to Boot
+        run: |
+          echo "⏳ Waiting for emulator to be ready..."
+          sleep 60
+          docker exec android-container adb wait-for-device
+          boot_completed=""
+          until [[ "$boot_completed" == "1" ]]; do
+            sleep 5
+            boot_completed=$(docker exec android-container adb shell getprop sys.boot_completed | tr -d '\r')
+            echo "Boot status: $boot_completed"
+          done
+          echo "✅ Emulator is ready!"
+
+      - name: Show Android Version (Test)
+        run: |
+          docker exec android-container adb shell getprop ro.build.version.release
