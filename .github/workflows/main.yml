@@ -1,39 +1,16 @@
-name: Android Emulator via Docker + ngrok
+image:
+  file: .gitpod.Dockerfile
 
-on:
-  workflow_dispatch:
+tasks:
+  - name: Start Android Emulator
+    command: |
+      docker run --privileged -d \
+        -p 6080:6080 \
+        -e DEVICE="Samsung Galaxy S10" \
+        -e WEB_VNC=true \
+        budtmo/docker-android:emulator_11.0
 
-jobs:
-  emulator:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v3
-
-      - name: Set up Docker Android (with GUI)
-        run: |
-          docker run -d --name android-emulator \
-            --privileged \
-            -p 6080:6080 \
-            -e DEVICE="Samsung Galaxy S10" \
-            -e WEB_VNC=true \
-            budtmo/docker-android-x86-8.1
-
-      - name: Install ngrok
-        run: |
-          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-          sudo apt update && sudo apt install ngrok
-
-      - name: Start ngrok tunnel
-        env:
-          NGROK_TOKEN: ${{ secrets.NGROK_TOKEN }}
-        run: |
-          ngrok config add-authtoken "$NGROK_TOKEN"
-          nohup ngrok http 6080 > ngrok.log &
-          sleep 10
-          curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
-
-      - name: ✅ Done
-        run: echo "Emulator and tunnel running — check ngrok logs."
+ports:
+  - port: 6080
+    onOpen: open-preview
+    visibility: public
