@@ -9,34 +9,35 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Set up Docker
+      - name: Install Docker (for Ubuntu 24.04+)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y docker.io
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sudo sh get-docker.sh
+          sudo usermod -aG docker $USER || true
 
-      - name: Start Android Emulator with GUI
+      - name: Start Android Emulator (Android 13 + GUI)
         run: |
-          docker run --privileged -d -p 6080:6080 \
+          sudo docker run --privileged -d -p 6080:6080 \
             -e DEVICE="Samsung Galaxy S6" \
+            --name android-emulator \
             budtmo/docker-android-x86-13.0
 
-      - name: Install ngrok
+      - name: Install Ngrok
         run: |
-          wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-stable-linux-amd64.zip
+          wget -q https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-stable-linux-amd64.zip
           unzip ngrok-stable-linux-amd64.zip
           sudo mv ngrok /usr/local/bin
 
-      - name: Auth ngrok
+      - name: Authenticate Ngrok
         run: ngrok config add-authtoken ${{ secrets.NGROK_TOKEN }}
 
-      - name: Start tunnel
+      - name: Start Ngrok Tunnel for VNC Port (6080)
         run: |
           nohup ngrok http 6080 > /dev/null 2>&1 &
-          sleep 8
-          curl http://localhost:4040/api/tunnels > tunnels.json
-          cat tunnels.json
-          echo "🔗 Public Android GUI:"
-          jq -r '.tunnels[0].public_url' tunnels.json
+          sleep 10
+          curl -s http://127.0.0.1:4040/api/tunnels > tunnels.json
+          echo "🔗 Android Public GUI Link:"
+          cat tunnels.json | jq -r '.tunnels[0].public_url'
